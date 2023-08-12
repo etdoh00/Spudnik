@@ -17,5 +17,5 @@ Welcome to the Rust Text Editor repository! This project demonstrates a simple y
 1. Clone this repository to your local machine:
 
    ```bash
-   git clone https://github.com/yourusername/rust-text-editor.git
+   git clone https://etdoh00/Spudnik.git
    cd rust-text-editor

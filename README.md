@@ -18,4 +18,4 @@ Welcome to the Rust Text Editor repository! This project demonstrates a simple y
 
    ```bash
    git clone https://etdoh00/Spudnik.git
-   cd rust-text-editor
+   cd spudnik

@@ -1,6 +1,6 @@
 use crossterm::event::{Event, KeyCode, KeyEvent};
-use crossterm::{cursor, event, execute,terminal};
-use std::io::{stdout, Write};
+use crossterm::{cursor, event, execute,terminal, queue};
+use std::io::{stdout, Write, self};
 use std::time::Duration; 
 use crossterm::terminal::ClearType; 
  
@@ -30,9 +30,54 @@ impl DetectKey {
     }
 }
 
+struct AppendBuffer
+{
+    content: String
+}
+
+impl AppendBuffer
+{
+    fn new() -> Self
+    {
+        Self { content: String::new() } //constructor for instance of appendbuffer
+    }
+
+    fn push(&mut self, ch: char) //append a character to the buffer
+    {
+        self.content.push(ch)
+    }
+
+    fn push_string(&mut self, string: &str) //append a string to the buffer
+    {
+        self.content.push_str(string)
+    }
+
+}
+
+//since appendbuffer is a struct of type AppendBuffer, the io::write must be written explicitly for this type, so it can use the io::Write trait
+impl io::Write for AppendBuffer {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> { // 
+        match std::str::from_utf8(buf) { // convert bytes into string so it can be added to "content", converts bytes if they're utf8 encoded
+            Ok(s) => {
+                self.content.push_str(s); //appends utf-8 string "s" to the content field for the buffer struct
+                Ok(s.len()) //return the length of the stirng if bytes can be converted, 
+            }
+            Err(_) => Err(io::ErrorKind::WriteZero.into()), // if cant be converted, return an error of write zero - zero bytes written
+        }
+    }
+
+
+    fn flush(&mut self) -> io::Result<()> {
+        let out = write!(stdout(), "{}", self.content); //write to the stdout using write! macro
+        stdout().flush()?; //call flush on standard output stream -> ensures any buffered content is actually written out
+        self.content.clear(); // clear content so it can be used for next screen refresh 
+        out // end of write! macro, indicates whether the buffer content was written or not
+    }
+}
 struct Display 
 {
-    bordersize: (usize,usize)
+    bordersize: (usize,usize),
+    content: AppendBuffer,
 }
 impl Display {
     /* Association methods */
@@ -41,8 +86,11 @@ impl Display {
         .map(|(x,y)|(x as usize, y as usize))
         .unwrap();
     
-        Self { bordersize }
+        Self { bordersize,
+        content: AppendBuffer::new(),
+     } 
     }
+
 
     fn wipe_screen() -> crossterm::Result<()> //wipes screen, return type result so can either be successful or an error
     {
@@ -50,29 +98,32 @@ impl Display {
         execute!(stdout(), cursor::MoveTo(0,0)) // reposition cursor to top left
     }
 
-    fn borders(&self) {
+    fn borders(&mut self) {
         let line_start = self.bordersize.1; //prints <> on each line, similar to vim
         for x in 0..line_start {
-            print!("<>");
-        if x < line_start-1 {
-            println!("\r");
+            self.content.push('>');
+            if x < line_start - 1 {
+                self.content.push_string("\r\n");
+            }
         }
-        stdout().flush();
     }
-}
     
     
-    fn refresh_screen(&self) -> crossterm::Result<()> // refresh screen 
+    fn refresh_screen(&mut self) -> crossterm::Result<()> // refresh screen 
     {
-        Self::wipe_screen()?; // calls the type self (Display struct) to clear the screen, hence refreshing it
+        
+        queue!(self.content, terminal::Clear(ClearType::All), cursor::MoveTo(0,0)); //waits for flush to be called then it is executed
         self.borders();
-        execute!(stdout(), cursor::MoveTo(0,0))
+        queue!(self.content, cursor::MoveTo(0,0))?; //wait for flush to be called 
+        self.content.flush()
     }
 }
 
+
 struct EditKey
 { edit: DetectKey,
-  display : Display,}
+  display : Display,
+  }
 
 impl EditKey { //this is the "engine" of the whole system, so it will be called in main to produce the system
 
@@ -94,7 +145,7 @@ impl EditKey { //this is the "engine" of the whole system, so it will be called 
             }
             return Ok(true) // true for all other key presses that != ALT+Q
     }
-    fn start(&self) -> crossterm::Result<bool> //process events from DetectKey
+    fn start(&mut self) -> crossterm::Result<bool> //process events from DetectKey
     {
         self.display.refresh_screen()?;
         self.constructpress()
@@ -109,9 +160,8 @@ fn main() -> crossterm::Result<()>
 
     let _broom = Sweep;
     terminal::enable_raw_mode()?;
-
-    let system = EditKey::create();
-    while system.start()? {}
+    let mut spud = EditKey::create();
+    while spud.start()? {}
 
     Ok(())
 

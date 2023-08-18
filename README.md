@@ -11,6 +11,7 @@ Welcome to the Rust Text Editor repository! This project demonstrates a simple y
 - **Copy, Cut, Paste:** Perform common text editing actions like copy, cut, and paste.
 - **Save Changes:** Save your edited content back to the file.
 - **Syntax Highlighting (Optional):** Enhance the editing experience with optional syntax highlighting for code files.
+- **Basic Encryption:** Protect files from unwanted eyes with basic encryption when imported / exported!
 
 ## Getting Started (once finished)
 
